@@ -1,0 +1,51 @@
+{
+  "name": "Node.js SQLite Development",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+
+  // Configure properties specific to VS Code
+  "customizations": {
+    "vscode": {
+      // Extensions to install inside the container
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "christian-kohler.npm-intellisense",
+        "eg2.vscode-npm-script",
+        "alexcvzz.vscode-sqlite"
+      ],
+      // VS Code settings for the container
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        }
+      }
+    }
+  },
+
+  // Forward ports for the app and debugging
+  "forwardPorts": [3000, 9229],
+  "portsAttributes": {
+    "3000": {
+      "label": "Application",
+      "onAutoForward": "notify"
+    },
+    "9229": {
+      "label": "Node Debug",
+      "onAutoForward": "silent"
+    }
+  },
+
+  // Post-create command to install dependencies
+  "postCreateCommand": "npm install",
+
+  // Keep container running
+  "overrideCommand": false,
+
+  // Run as non-root user
+  "remoteUser": "node"
+}

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Mount source code for live updates
+      - .:/workspace:cached
+      # Use named volume for node_modules to avoid overwriting
+      - node_modules:/workspace/node_modules
+      # Persist SQLite database
+      - ./data:/workspace/data
+    ports:
+      - "3000:3000"   # Application port
+      - "9229:9229"   # Node.js debugging port
+    environment:
+      - NODE_ENV=development
+      - DATABASE_PATH=/workspace/data/stocks.db
+    command: npm run dev
+    stdin_open: true
+    tty: true
+
+volumes:
+  node_modules:

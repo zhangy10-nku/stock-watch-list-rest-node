@@ -1,0 +1,23 @@
+{
+  "name": "stock-watch-list-rest-node",
+  "version": "1.0.0",
+  "description": "Stock watchlist REST API with Node.js and SQLite in Docker",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon --inspect=0.0.0.0:9229 src/index.js",
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["stocks", "rest-api", "sqlite", "docker"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
