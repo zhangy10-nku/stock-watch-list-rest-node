@@ -1,14 +1,18 @@
 # Stock Watchlist REST API with Historical Data
 
-A comprehensive Node.js REST API for managing stock watchlists and fetching historical stock data, built with Express and SQLite, running entirely in Docker containers. Features integration with Alpha Vantage API for real-time quotes and 20+ years of historical market data.
+A comprehensive Node.js REST API for managing stock watchlists and fetching historical stock data, built with Express and SQLite, running entirely in Docker containers. Features hybrid data architecture with Alpha Vantage for historical data and Yahoo Finance (yfinance) for unlimited real-time price checks.
+
+![alt text](image.png)
 
 ## 📖 Table of Contents
 
 - [🚀 Features](#-features)
+- [🏗️ Architecture](#️-architecture)
 - [📋 Prerequisites](#-prerequisites)
 - [🏁 Getting Started](#-getting-started)
 - [🔧 Configuration](#-configuration)
 - [📡 API Endpoints](#-api-endpoints)
+  - [Current Price API](#current-price-api)
   - [JSONata Query API](#jsonata-query-api)
   - [Legacy Watchlist API](#legacy-watchlist-api)
   - [Historical Data API](#historical-data-api)
@@ -34,13 +38,21 @@ A comprehensive Node.js REST API for managing stock watchlists and fetching hist
 ### Historical Data Features
 - 📈 **20+ years of historical stock data** (1999-present)
 - 🎯 **Magnificent 7 tech stocks** pre-configured (AAPL, MSFT, GOOGL, AMZN, TSLA, META, NVDA)
-- 🔄 **Manual data refresh** endpoints (no cron jobs needed)
-- 📊 **Real-time stock quotes** via Alpha Vantage API
+- 🔄 **Automatic startup refresh** with smart daily caching
+- 📊 **Split-adjusted prices** stored in database
 - 🏢 **Company overview** and fundamental data
 - 📉 **OHLCV data** (Open, High, Low, Close, Volume)
 - 🔍 **Flexible date range queries**
 - ⚡ **Built-in rate limiting** for API calls
 - 🆓 **Free tier support** (25 API calls/day)
+
+### Real-Time Price Features
+- 💰 **Unlimited current price checks** via Yahoo Finance (yfinance)
+- 🚀 **Separate Python microservice** for price data
+- ⚡ **~15 minute delayed data** (no API key required)
+- 📊 **OHLCV + detailed quotes** (market cap, PE ratio, 52-week high/low)
+- 🔄 **Bulk price fetching** for multiple stocks
+- 🏥 **Health checks** and fallback support
 
 ### JSONata Query Features
 - 🔍 **Declarative querying** with JSONata expressions
@@ -51,6 +63,62 @@ A comprehensive Node.js REST API for managing stock watchlists and fetching hist
 - 🔢 **Mathematical operations** on historical data
 - 📅 **Time-based filtering** with flexible date ranges
 - 🎨 **Custom expressions** for any analysis need
+
+## 🏗️ Architecture
+
+### Hybrid Data Architecture
+
+This project uses a two-service microservices architecture to optimize API usage and provide both historical and real-time data:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       Frontend / Client                      │
+└───────────────┬─────────────────────────────────────────────┘
+                │
+                ▼
+┌───────────────────────────────────────────────────────────────┐
+│              Node.js Backend (Express + SQLite)               │
+│  • Historical data (Alpha Vantage - 25 req/day)              │
+│  • JSONata queries on stored data                            │
+│  • Startup refresh service (smart daily caching)             │
+│  • Split-adjusted prices in DB                               │
+└───────────────┬───────────────────────────────────────────────┘
+                │
+                ├─────────────┐
+                ▼             ▼
+    ┌───────────────────┐   ┌─────────────────────────────┐
+    │  Alpha Vantage    │   │  Python Price Service       │
+    │  (Historical)     │   │  (Flask + yfinance)         │
+    │  • Daily OHLCV    │   │  • Unlimited requests       │
+    │  • 25 calls/day   │   │  • ~15 min delay            │
+    │  • Split data     │   │  • No API key needed        │
+    └───────────────────┘   └─────────────────────────────┘
+```
+
+### Key Benefits
+
+1. **API Budget Management**: Startup refresh checks daily and skips if already done (0 API calls on subsequent restarts)
+2. **Split-Adjusted Prices**: Historical prices automatically adjusted for stock splits before storage
+3. **Unlimited Current Prices**: Python service scrapes Yahoo Finance with no rate limits
+4. **Two-Container Architecture**: Node backend + Python price service with Docker networking
+5. **Smart Refresh Logic**: 
+   - First startup: 2 API calls per stock (historical data + splits)
+   - Subsequent startups same day: 0 API calls (skipped via DB tracking)
+   - Manual refresh available when needed
+
+### Daily Workflow
+
+**Morning (First Server Start):**
+- Startup refresh checks `last_data_refresh` column
+- Fetches updated historical data for stale stocks
+- Checks for new stock splits
+- Updates DB with split-adjusted prices
+- Uses ~2 API calls per stock
+
+**Throughout the Day:**
+- Server restarts use 0 API calls (already refreshed)
+- Current prices from Python service (unlimited)
+- All queries run on local SQLite database
 
 ## 📋 Prerequisites
 
@@ -114,6 +182,9 @@ DATABASE_PATH=./data/stocks.db
 
 # Server Configuration
 PORT=3000
+
+# Price Service Configuration (set automatically by Docker Compose)
+PRICE_SERVICE_URL=http://price-service:5000
 ```
 
 ## 🐛 Debugging
@@ -125,6 +196,109 @@ PORT=3000
 5. Set breakpoints in your code and they'll be hit!
 
 ## 📡 API Endpoints
+
+### Health Check
+
+#### Check system health
+```bash
+GET /health
+
+# Example:
+curl http://localhost:3000/health
+```
+
+**Response:**
+```json
+{
+  "status": "OK",
+  "timestamp": "2025-11-16T19:27:57.829Z"
+}
+```
+
+### Current Price API
+
+Get real-time stock prices via Python microservice (Yahoo Finance). Unlimited requests, ~15 minute delayed data.
+
+#### Get current price for single stock
+```bash
+GET /api/stocks/current-price/:symbol
+
+# Example:
+curl -s http://localhost:3000/api/stocks/current-price/NVDA | jq
+```
+
+**Response:**
+```json
+{
+  "symbol": "NVDA",
+  "price": 190.17,
+  "open": 182.86,
+  "high": 191.01,
+  "low": 180.58,
+  "close": 190.17,
+  "volume": 186591856,
+  "timestamp": "2025-11-14 16:00:00"
+}
+```
+
+#### Get current prices for multiple stocks (bulk)
+```bash
+POST /api/stocks/current-prices
+Content-Type: application/json
+
+{
+  "symbols": ["AAPL", "NVDA", "TSLA"]
+}
+
+# Example:
+curl -X POST http://localhost:3000/api/stocks/current-prices \
+  -H "Content-Type: application/json" \
+  -d '{"symbols": ["NVDA", "AAPL", "GOOGL"]}' | jq
+```
+
+**Response:**
+```json
+{
+  "data": {
+    "NVDA": {
+      "price": 190.17,
+      "open": 182.86,
+      "high": 191.01,
+      "low": 180.58,
+      "close": 190.17,
+      "volume": 186591856
+    },
+    "AAPL": { ... },
+    "GOOGL": { ... }
+  },
+  "errors": {}
+}
+```
+
+#### Get detailed quote with market info
+```bash
+GET /api/stocks/current-quote/:symbol
+
+# Example:
+curl -s http://localhost:3000/api/stocks/current-quote/AAPL | jq
+```
+
+**Response:**
+```json
+{
+  "symbol": "AAPL",
+  "price": 272.41,
+  "marketCap": 4146285010944,
+  "peRatio": 42.15,
+  "week52High": 275.96,
+  "week52Low": 164.08,
+  "avgVolume": 56789012,
+  "previousClose": 271.05,
+  "change": 1.36,
+  "changePercent": 0.50,
+  "timestamp": "2025-11-14 16:00:00"
+}
+```
 
 ### JSONata Query API
 
@@ -489,22 +663,33 @@ GET /api/stocks/init/status          # Initialization status
 ### Quick Start Examples
 
 ```bash
-# 1. Check if API is configured
+# 1. Check system health
+curl -s http://localhost:3000/health | jq
+
+# 2. Check if API is configured
 curl -s http://localhost:3000/api/stocks/init/status | jq
 
-# 2. Initialize Magnificent 7 stocks (first time setup)
+# 3. Initialize Magnificent 7 stocks (first time setup)
 curl -X POST http://localhost:3000/api/stocks/init \
   -H "Content-Type: application/json" \
   -d '{"forceRefresh": false}' | jq
 
-# 3. Get database summary
+# 4. Get database summary
 curl -s http://localhost:3000/api/stocks/summary | jq
 
-# 4. Get historical data for Apple (last 5 records)
+# 5. Get current price for NVIDIA
+curl -s http://localhost:3000/api/stocks/current-price/NVDA | jq
+
+# 6. Get current prices for multiple stocks
+curl -X POST http://localhost:3000/api/stocks/current-prices \
+  -H "Content-Type: application/json" \
+  -d '{"symbols": ["NVDA", "AAPL", "TSLA"]}' | jq
+
+# 7. Get historical data for Apple (last 5 records)
 curl -s "http://localhost:3000/api/stocks/historical/AAPL?limit=5" | jq
 
-# 5. Get real-time quote for Tesla
-curl -s http://localhost:3000/api/stocks/quote/TSLA | jq
+# 8. Get detailed quote for Tesla
+curl -s http://localhost:3000/api/stocks/current-quote/TSLA | jq
 ```
 
 ### JSONata Query Examples
@@ -578,6 +763,23 @@ curl -X PUT http://localhost:3000/api/stocks/1 \
 curl -X DELETE http://localhost:3000/api/stocks/1
 ```
 
+### Current Price Examples
+
+```bash
+# Single stock current price
+curl -s http://localhost:3000/api/stocks/current-price/NVDA | jq
+curl -s http://localhost:3000/api/stocks/current-price/AAPL | jq
+
+# Bulk current prices
+curl -X POST http://localhost:3000/api/stocks/current-prices \
+  -H "Content-Type: application/json" \
+  -d '{"symbols": ["NVDA", "AAPL", "GOOGL", "MSFT"]}' | jq
+
+# Detailed quote with market info
+curl -s http://localhost:3000/api/stocks/current-quote/TSLA | jq
+curl -s http://localhost:3000/api/stocks/current-quote/META | jq
+```
+
 ### Historical Data Examples
 
 ```bash
@@ -588,7 +790,7 @@ curl -s http://localhost:3000/api/stocks/tracked | jq
 curl -s "http://localhost:3000/api/stocks/historical/MSFT?limit=3" | jq
 curl -s "http://localhost:3000/api/stocks/historical/GOOGL?startDate=2024-01-01&endDate=2024-12-31" | jq
 
-# Get real-time quotes
+# Get real-time quotes (Alpha Vantage - uses API quota)
 curl -s http://localhost:3000/api/stocks/quote/META | jq
 curl -s http://localhost:3000/api/stocks/quote/NVDA | jq
 
@@ -626,15 +828,24 @@ This backend maintains a comprehensive SQLite database with both historical stoc
 - **32,364+ daily records** spanning from 1999 to 2025
 - **Magnificent 7 tech stocks**: AAPL, MSFT, GOOGL, AMZN, TSLA, META, NVDA
 - **Daily OHLCV data**: Open, High, Low, Close prices and Volume
-- **Real-time capabilities**: Live quotes and company information via Alpha Vantage API
+- **Split-adjusted prices**: Automatically adjusted for stock splits
+- **Smart refresh tracking**: Daily refresh checks prevent duplicate API calls
 - **Flexible querying**: Date ranges, pagination, and symbol-based filtering
+
+### Real-Time Price Data
+- **Unlimited requests**: Python microservice using Yahoo Finance (yfinance)
+- **~15 minute delay**: Free tier data, no API key required
+- **Bulk fetching**: Get prices for multiple stocks in single request
+- **Detailed quotes**: Market cap, PE ratio, 52-week high/low, volume
+- **Two-container architecture**: Node backend + Python price service
 
 ### Database Statistics
 - **Data Range**: January 1999 - January 2025 (20+ years)
-- **Update Frequency**: Manual refresh via API endpoints
-- **Data Source**: Alpha Vantage Financial API
+- **Update Frequency**: Automatic daily refresh on first startup, 0 API calls on subsequent restarts
+- **Data Sources**: Alpha Vantage (historical), Yahoo Finance (current prices)
 - **Storage**: Local SQLite database for persistence
 - **Performance**: Indexed queries for fast historical lookups
+- **Refresh Tracking**: `last_data_refresh` and `last_split_check` columns prevent redundant API calls
 
 ### Legacy Watchlist Features
 - Track personal stock positions with purchase prices and quantities
@@ -644,8 +855,9 @@ This backend maintains a comprehensive SQLite database with both historical stoc
 
 ### Data Structure
 ```
-tracked_stocks: Configured symbols and metadata
-historical_stock_data: Daily OHLCV records with date indexing
+tracked_stocks: Configured symbols with refresh tracking (last_data_refresh, last_split_check)
+historical_stock_data: Daily OHLCV records with split-adjusted prices
+stock_splits: Corporate action history for split adjustments
 stocks: Personal watchlist entries (legacy feature)
 ```
 
@@ -676,25 +888,34 @@ NODE_ENV=development
 ```
 stock-watch-list-rest-node/
 ├── .devcontainer/
-│   └── devcontainer.json      # Dev container configuration
+│   └── devcontainer.json           # Dev container configuration
 ├── .vscode/
-│   └── launch.json            # VS Code debugger configuration
+│   └── launch.json                 # VS Code debugger configuration
 ├── src/
-│   ├── index.js               # Application entry point
-│   ├── database.js            # SQLite database setup and schema
+│   ├── index.js                    # Application entry point with startup refresh
+│   ├── database.js                 # SQLite database setup and schema
 │   ├── routes/
-│   │   └── stocks.js          # Stock routes and API handlers
+│   │   └── stocks.js               # Stock routes and API handlers
 │   └── services/
-│       ├── alphaVantageService.js    # Alpha Vantage API client
-│       ├── dataRefreshService.js     # Historical data operations
-│       └── dataInitService.js        # Magnificent 7 initialization
-├── data/                      # SQLite database files (auto-created)
-│   └── stocks.db              # Main database file
-├── .env                       # Environment variables (create from .env.example)
-├── Dockerfile                 # Docker image definition
-├── docker-compose.yml         # Docker Compose configuration
-├── package.json               # Node.js dependencies and scripts
-└── README.md                  # This documentation
+│       ├── alphaVantageService.js      # Alpha Vantage API client
+│       ├── dataRefreshService.js       # Historical data operations
+│       ├── dataInitService.js          # Magnificent 7 initialization
+│       ├── queryService.js             # JSONata query execution
+│       ├── splitAdjustmentService.js   # Stock split adjustments
+│       ├── startupRefreshService.js    # Automatic daily refresh logic
+│       └── priceService.js             # Python price service client
+├── price-service/                  # Python microservice for current prices
+│   ├── app.py                      # Flask API with yfinance
+│   ├── requirements.txt            # Python dependencies
+│   └── Dockerfile                  # Python service container
+├── data/                           # SQLite database files (auto-created)
+│   └── stocks.db                   # Main database file
+├── .env                            # Environment variables (create from .env.example)
+├── Dockerfile                      # Node.js backend container
+├── docker-compose.yml              # Two-service orchestration
+├── package.json                    # Node.js dependencies and scripts
+├── ARCHITECTURE.md                 # Detailed architecture documentation
+└── README.md                       # This documentation
 ```
 
 ## 🔄 Live Reloading
@@ -718,20 +939,32 @@ The SQLite database is stored in the `./data` directory, which is:
 ## 📦 Docker Commands
 
 ```bash
-# Build the container
+# Build both containers (Node + Python)
 docker-compose build
 
-# Start the container
+# Start all services
 docker-compose up
 
 # Start in detached mode
 docker-compose up -d
 
-# Stop the container
+# Stop all services
 docker-compose down
 
-# View logs
+# View logs for all services
 docker-compose logs -f
+
+# View logs for specific service
+docker-compose logs -f app           # Node backend
+docker-compose logs -f price-service # Python service
+
+# Restart specific service
+docker-compose restart app
+docker-compose restart price-service
+
+# Check service health
+curl http://localhost:3000/health        # Node backend
+curl http://localhost:5001/health        # Python price service
 
 # Rebuild from scratch
 docker-compose down
@@ -833,6 +1066,48 @@ curl -X POST http://localhost:3000/api/stocks/init \
   -H "Content-Type: application/json" \
   -d '{"forceRefresh": true}' | jq
 ```
+
+### Price Service Issues
+```bash
+# Check if price service is running
+curl -s http://localhost:5001/health | jq
+
+# Test single stock price
+curl -s http://localhost:3000/api/stocks/current-price/AAPL | jq
+
+# Check Docker containers status
+docker-compose ps
+
+# Restart price service if needed
+docker-compose restart price-service
+docker-compose logs -f price-service
+```
+
+**Common Price Service Issues:**
+- `Service unavailable`: Ensure both containers are running with `docker-compose ps`
+- `Network timeout`: Price service may be slow, wait and retry
+- `Empty data`: Market closed or symbol invalid
+- `Connection refused`: Check containers can communicate (networking issue)
+
+### Startup Refresh Issues
+```bash
+# Check last refresh timestamps
+curl -s http://localhost:3000/api/stocks/tracked | jq
+
+# View startup logs
+docker-compose logs app | grep "refresh"
+
+# Force manual refresh if needed
+curl -X POST http://localhost:3000/api/stocks/refresh-all \
+  -H "Content-Type: application/json" \
+  -d '{"fullRefresh": false}' | jq
+```
+
+**Smart Refresh Logic:**
+- First startup of the day: Uses 2 API calls per stock (historical + splits)
+- Subsequent startups same day: Uses 0 API calls (skipped)
+- Next day: Automatically refreshes stale data
+- Check `last_data_refresh` column in `tracked_stocks` table
 
 ## 📝 License
 

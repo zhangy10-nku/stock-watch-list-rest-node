@@ -49,6 +49,8 @@ function initializeDatabase() {
       symbol TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       last_updated DATETIME,
+      last_data_refresh DATE,
+      last_split_check DATE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `, (err) => {
@@ -56,6 +58,9 @@ function initializeDatabase() {
       console.error('❌ Error creating tracked_stocks table:', err.message);
     } else {
       console.log('✅ Tracked stocks table initialized');
+      // Add columns if they don't exist (for existing databases)
+      db.run(`ALTER TABLE tracked_stocks ADD COLUMN last_data_refresh DATE`, () => {});
+      db.run(`ALTER TABLE tracked_stocks ADD COLUMN last_split_check DATE`, () => {});
     }
   });
 

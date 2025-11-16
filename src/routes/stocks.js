@@ -6,6 +6,7 @@ const dataInitService = require('../services/dataInitService');
 const alphaVantageService = require('../services/alphaVantageService');
 const queryService = require('../services/queryService');
 const splitAdjustmentService = require('../services/splitAdjustmentService');
+const priceService = require('../services/priceService');
 
 // === UTILITY ENDPOINTS (must come before parameterized routes) ===
 
@@ -168,6 +169,96 @@ router.post('/splits/:symbol', async (req, res) => {
 
   } catch (error) {
     console.error('Error adding stock split:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === REAL-TIME PRICE ENDPOINTS ===
+
+// Get current price from price service (yfinance)
+router.get('/current-price/:symbol', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    
+    // Check if price service is available
+    const isAvailable = await priceService.isAvailable();
+    
+    if (!isAvailable) {
+      return res.status(503).json({ 
+        error: 'Price service is currently unavailable',
+        suggestion: 'Ensure docker-compose is running with both services'
+      });
+    }
+
+    const priceData = await priceService.getCurrentPrice(symbol.toUpperCase());
+    
+    res.json({ 
+      symbol: symbol.toUpperCase(),
+      ...priceData 
+    });
+
+  } catch (error) {
+    console.error('Error fetching current price:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get current prices for multiple stocks
+router.post('/current-prices', async (req, res) => {
+  try {
+    const { symbols } = req.body;
+
+    if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
+      return res.status(400).json({ 
+        error: 'Array of symbols is required',
+        example: { symbols: ['AAPL', 'NVDA', 'TSLA'] }
+      });
+    }
+
+    // Check if price service is available
+    const isAvailable = await priceService.isAvailable();
+    
+    if (!isAvailable) {
+      return res.status(503).json({ 
+        error: 'Price service is currently unavailable',
+        suggestion: 'Ensure docker-compose is running with both services'
+      });
+    }
+
+    const priceData = await priceService.getCurrentPrices(symbols.map(s => s.toUpperCase()));
+    
+    res.json(priceData);
+
+  } catch (error) {
+    console.error('Error fetching current prices:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get detailed quote with market info
+router.get('/current-quote/:symbol', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    
+    // Check if price service is available
+    const isAvailable = await priceService.isAvailable();
+    
+    if (!isAvailable) {
+      return res.status(503).json({ 
+        error: 'Price service is currently unavailable',
+        suggestion: 'Ensure docker-compose is running with both services'
+      });
+    }
+
+    const quoteData = await priceService.getQuoteInfo(symbol.toUpperCase());
+    
+    res.json({ 
+      symbol: symbol.toUpperCase(),
+      ...quoteData 
+    });
+
+  } catch (error) {
+    console.error('Error fetching current quote:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

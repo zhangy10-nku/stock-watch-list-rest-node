@@ -26,7 +26,7 @@ class AlphaVantageService {
       throw new Error('Alpha Vantage API key not configured');
     }
 
-    // Use free TIME_SERIES_DAILY endpoint instead of premium TIME_SERIES_DAILY_ADJUSTED
+    // Use free TIME_SERIES_DAILY endpoint (split adjustment done separately)
     const url = `${BASE_URL}?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=${outputSize}&apikey=${ALPHA_VANTAGE_API_KEY}`;
     
     try {
@@ -61,7 +61,7 @@ class AlphaVantageService {
         high: parseFloat(values['2. high']),
         low: parseFloat(values['3. low']),
         close: parseFloat(values['4. close']),
-        adjusted_close: parseFloat(values['4. close']), // Use close price as adjusted_close for free tier
+        adjusted_close: parseFloat(values['4. close']), // Will be adjusted for splits before storage
         volume: parseInt(values['5. volume'])
       }));
 

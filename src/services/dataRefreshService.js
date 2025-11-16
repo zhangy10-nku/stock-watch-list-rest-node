@@ -13,7 +13,7 @@ class DataRefreshService {
    * @returns {Promise<Object>} Result with inserted/updated counts
    */
   async storeHistoricalData(historicalData) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       if (!historicalData || historicalData.length === 0) {
         return resolve({ inserted: 0, updated: 0, skipped: 0 });
       }
@@ -26,7 +26,11 @@ class DataRefreshService {
 
       console.log(`💾 Storing ${historicalData.length} records for ${symbol}...`);
 
-      historicalData.forEach((record) => {
+      // Apply split adjustments to the data BEFORE storing
+      console.log(`🔧 Applying split adjustments for ${symbol}...`);
+      const adjustedData = await splitAdjustmentService.adjustStockRecords(historicalData);
+
+      adjustedData.forEach((record) => {
         const sql = `
           INSERT OR REPLACE INTO historical_stock_data 
           (symbol, date, open, high, low, close, adjusted_close, volume)
@@ -147,25 +151,13 @@ class DataRefreshService {
       sql += ' ORDER BY date DESC LIMIT ?';
       params.push(limit);
 
-      db.all(sql, params, async (err, rows) => {
+      db.all(sql, params, (err, rows) => {
         if (err) {
           console.error('❌ Error fetching historical data:', err.message);
           reject(err);
         } else {
-          try {
-            // Apply split adjustments to the data
-            const adjustedData = await splitAdjustmentService.adjustStockRecords(rows);
-            resolve(adjustedData);
-          } catch (adjustmentError) {
-            console.error('❌ Error applying split adjustments:', adjustmentError.message);
-            // Fall back to original data if split adjustment fails
-            resolve(rows.map(row => ({
-              ...row,
-              adjusted_close: row.close,
-              split_adjusted: false,
-              adjustment_factor: 1.0
-            })));
-          }
+          // Data is already split-adjusted in the database
+          resolve(rows);
         }
       });
     });

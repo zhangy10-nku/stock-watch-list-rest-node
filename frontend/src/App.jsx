@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import TickerBar from './components/TickerBar';
+import MetricsPanel from './components/MetricsPanel';
 import TemplateGallery from './components/TemplateGallery';
 import StockSelector from './components/StockSelector';
 import DateRangePicker from './components/DateRangePicker';
@@ -17,6 +19,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [advancedMode, setAdvancedMode] = useState(false);
+  const [metricsVisible, setMetricsVisible] = useState(false);
+  const [metricsSymbol, setMetricsSymbol] = useState(null);
 
   // Fetch templates on mount
   useEffect(() => {
@@ -167,16 +171,34 @@ function App() {
     setAdvancedMode(false);
   };
 
+  // Handle ticker click - toggle metrics panel
+  const handleTickerClick = (clickedSymbol) => {
+    if (metricsVisible && metricsSymbol === clickedSymbol) {
+      // Clicking same symbol - close metrics
+      setMetricsVisible(false);
+      setMetricsSymbol(null);
+    } else {
+      // Clicking different symbol or opening for first time
+      setSymbol(clickedSymbol);
+      setMetricsSymbol(clickedSymbol);
+      setMetricsVisible(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Header */}
-      <header className="bg-gray-800 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8">
-          <h1 className="text-xl font-bold text-gray-100">
-            Stock Watch - JSONata Query Interface
-          </h1>
-        </div>
-      </header>
+      {/* Ticker Bar */}
+      <TickerBar onSymbolClick={handleTickerClick} />
+
+      {/* Metrics Panel */}
+      <MetricsPanel 
+        symbol={metricsSymbol} 
+        visible={metricsVisible}
+        onClose={() => {
+          setMetricsVisible(false);
+          setMetricsSymbol(null);
+        }}
+      />
 
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

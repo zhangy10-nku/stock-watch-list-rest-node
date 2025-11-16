@@ -19,8 +19,26 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_PATH=/workspace/data/stocks.db
+      - PRICE_SERVICE_URL=http://price-service:5000
+    depends_on:
+      - price-service
     stdin_open: true
     tty: true
+
+  price-service:
+    build:
+      context: ./price-service
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5000"   # Expose on host port 5001, container port 5000
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   node_modules:

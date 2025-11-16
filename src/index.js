@@ -3,6 +3,8 @@ const cors = require('cors');
 const path = require('path');
 const db = require('./database');
 const stockRoutes = require('./routes/stocks');
+const startupRefreshService = require('./services/startupRefreshService');
+const priceService = require('./services/priceService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,9 +34,39 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Stock Watchlist API is ready!`);
-  console.log(`🐛 Debug port: 9229`);
+// Startup initialization
+async function startup() {
+  console.log('\n' + '='.repeat(60));
+  console.log('🚀 STARTING STOCK WATCHLIST APPLICATION');
+  console.log('='.repeat(60) + '\n');
+
+  // Wait for database to be ready
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  // Check price service availability
+  console.log('📈 Checking price service availability...');
+  const priceServiceAvailable = await priceService.isAvailable();
+  
+  if (!priceServiceAvailable) {
+    console.warn('⚠️  Price service not available yet, will retry later');
+  }
+
+  // Perform startup refresh
+  await startupRefreshService.performStartupRefresh();
+
+  // Start the Express server
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log('\n' + '='.repeat(60));
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`📊 Stock Watchlist API is ready!`);
+    console.log(`🐛 Debug port: 9229`);
+    console.log(`📈 Price service: ${priceServiceAvailable ? 'Available' : 'Unavailable'}`);
+    console.log('='.repeat(60) + '\n');
+  });
+}
+
+// Start the application
+startup().catch(error => {
+  console.error('❌ Failed to start application:', error);
+  process.exit(1);
 });
