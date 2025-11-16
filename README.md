@@ -150,7 +150,14 @@ VS Code will automatically:
 docker-compose up --build
 
 # The API will be available at http://localhost:3000
+# The web UI will be available at http://localhost:3000 (React frontend with live ticker bar and metrics)
 ```
+
+**Access the application:**
+- **Web UI**: http://localhost:3000 - Interactive query interface with real-time ticker bar and metrics panel
+- **API**: http://localhost:3000/api/stocks - REST API endpoints
+- **Health Check**: http://localhost:3000/health - System status
+- **Price Service**: http://localhost:5001/health - Python microservice status
 
 ## 🔧 Configuration
 
@@ -480,8 +487,8 @@ curl -X POST http://localhost:3000/api/stocks/query/AAPL \
 -H "Content-Type: application/json" \
 -d '{
   "queries": {
-    "weeklyHigh": "$max(data[0..4].high)",
-    "monthlyVolume": "$sum(data[0..21].volume)",
+    "weeklyHigh": "$max($filter(data, function($v, $i) { $i < 5 }).high)",
+    "monthlyVolume": "$sum($filter(data, function($v, $i) { $i < 22 }).volume)",
     "priceAbove200": "$count(data[close > 200])",
     "volumeSpikes": "$count(data[volume > $average(data.volume) * 2])"
   }
