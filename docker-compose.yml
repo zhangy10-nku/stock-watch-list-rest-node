@@ -10,6 +10,7 @@ services:
       - .:/workspace:cached
       # Use named volume for node_modules to avoid overwriting
       - node_modules:/workspace/node_modules
+      - frontend_node_modules:/workspace/frontend/node_modules
       # Persist SQLite database
       - ./data:/workspace/data
     ports:
@@ -18,9 +19,9 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_PATH=/workspace/data/stocks.db
-    command: npm run dev
     stdin_open: true
     tty: true
 
 volumes:
   node_modules:
+  frontend_node_modules:

@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Frontend build output
+public/
+frontend/dist/
+
 # SQLite Database
 data/
 *.db

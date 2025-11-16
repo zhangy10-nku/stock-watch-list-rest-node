@@ -27,11 +27,15 @@ COPY . .
 # Ensure proper ownership after copying files
 RUN chown -R node:node /workspace
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && chown node:node /usr/local/bin/docker-entrypoint.sh
+
 # Switch to node user
 USER node
 
 # Expose application port and debug port
 EXPOSE 3000 9229
 
-# Start the application with nodemon and debugging enabled
-CMD ["npm", "run", "dev"]
+# Use entrypoint script
+ENTRYPOINT ["docker-entrypoint.sh"]

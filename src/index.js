@@ -11,23 +11,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Routes
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Stock Watchlist API',
-    version: '1.0.0',
-    endpoints: {
-      stocks: '/api/stocks',
-      health: '/health'
-    }
-  });
-});
+// Serve static files from public directory (React app)
+app.use(express.static(path.join(__dirname, '../public')));
 
+// API Routes
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 app.use('/api/stocks', stockRoutes);
+
+// Catch-all route - serve React app for any non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

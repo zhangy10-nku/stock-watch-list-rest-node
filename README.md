@@ -1,15 +1,56 @@
-# Stock Watchlist REST API
+# Stock Watchlist REST API with Historical Data
 
-A Node.js REST API for managing a stock watchlist, built with Express and SQLite, running entirely in Docker containers.
+A comprehensive Node.js REST API for managing stock watchlists and fetching historical stock data, built with Express and SQLite, running entirely in Docker containers. Features integration with Alpha Vantage API for real-time quotes and 20+ years of historical market data.
+
+## 📖 Table of Contents
+
+- [🚀 Features](#-features)
+- [📋 Prerequisites](#-prerequisites)
+- [🏁 Getting Started](#-getting-started)
+- [🔧 Configuration](#-configuration)
+- [📡 API Endpoints](#-api-endpoints)
+  - [JSONata Query API](#jsonata-query-api)
+  - [Legacy Watchlist API](#legacy-watchlist-api)
+  - [Historical Data API](#historical-data-api)
+  - [Real-time Market Data](#real-time-market-data)
+  - [Data Management](#data-management)
+- [🧪 Testing the API](#-testing-the-api)
+- [📊 Data Overview](#-data-overview)
+- [📁 Project Structure](#-project-structure)
+- [🔄 Development Workflow](#-development-workflow)
+- [🛠️ Docker Commands](#️-docker-commands)
+- [🔍 Troubleshooting](#-troubleshooting)
 
 ## 🚀 Features
 
+### Core Features
 - ✅ Full CRUD operations for stock watchlist
 - ✅ SQLite database for data persistence
 - ✅ Dockerized development environment
 - ✅ Live code reloading with nodemon
 - ✅ VS Code debugging support
 - ✅ No local Node.js or SQLite installation required
+
+### Historical Data Features
+- 📈 **20+ years of historical stock data** (1999-present)
+- 🎯 **Magnificent 7 tech stocks** pre-configured (AAPL, MSFT, GOOGL, AMZN, TSLA, META, NVDA)
+- 🔄 **Manual data refresh** endpoints (no cron jobs needed)
+- 📊 **Real-time stock quotes** via Alpha Vantage API
+- 🏢 **Company overview** and fundamental data
+- 📉 **OHLCV data** (Open, High, Low, Close, Volume)
+- 🔍 **Flexible date range queries**
+- ⚡ **Built-in rate limiting** for API calls
+- 🆓 **Free tier support** (25 API calls/day)
+
+### JSONata Query Features
+- 🔍 **Declarative querying** with JSONata expressions
+- 📊 **Complex aggregations** (min, max, average, count, volatility)
+- 🎯 **Pattern detection** (price movements, gaps, trends)
+- ⚡ **Multiple queries** in single API call
+- 📈 **Advanced analytics** (moving averages, performance metrics)
+- 🔢 **Mathematical operations** on historical data
+- 📅 **Time-based filtering** with flexible date ranges
+- 🎨 **Custom expressions** for any analysis need
 
 ## 📋 Prerequisites
 
@@ -43,6 +84,38 @@ docker-compose up --build
 # The API will be available at http://localhost:3000
 ```
 
+## 🔧 Configuration
+
+### Alpha Vantage API Setup
+
+To use historical data and real-time features, you need a free Alpha Vantage API key:
+
+1. **Get a free API key** at [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
+2. **Set your API key** in the `.env` file:
+
+```bash
+# .env
+ALPHA_VANTAGE_API_KEY=your_api_key_here
+```
+
+### Environment Variables
+
+The `.env` file contains the following configuration:
+
+```bash
+# Alpha Vantage API Configuration
+ALPHA_VANTAGE_API_KEY=your_api_key_here
+
+# Magnificent 7 Tech Stocks to track
+MAGNIFICENT_7_STOCKS=AAPL,MSFT,GOOGL,AMZN,TSLA,META,NVDA
+
+# Database Configuration  
+DATABASE_PATH=./data/stocks.db
+
+# Server Configuration
+PORT=3000
+```
+
 ## 🐛 Debugging
 
 1. Start the dev container or run `docker-compose up`
@@ -53,19 +126,209 @@ docker-compose up --build
 
 ## 📡 API Endpoints
 
-### Get all stocks
+### JSONata Query API
+
+Execute declarative queries on historical stock data using JSONata expressions. Perfect for complex analysis, pattern detection, and custom aggregations.
+
+#### Get query templates
 ```bash
-GET http://localhost:3000/api/stocks
+GET /api/stocks/query/templates
 ```
 
-### Get a single stock
+**Example:**
 ```bash
-GET http://localhost:3000/api/stocks/:id
+curl -s http://localhost:3000/api/stocks/query/templates | jq
 ```
 
-### Create a new stock
+**Response includes:**
+- **Basic queries**: globalHigh, globalLow, avgClose, totalVolume
+- **Performance**: totalReturn, priceRange, volatility
+- **Advanced**: movingAverages, pattern detection
+- **Usage examples**: Ready-to-use curl commands
+
+#### Execute single JSONata query
 ```bash
-POST http://localhost:3000/api/stocks
+GET /api/stocks/query/:symbol?expression=JSONATA_EXPRESSION&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&limit=N
+
+# Examples:
+GET /api/stocks/query/NVDA?expression=$max(data.close)&startDate=2020-01-01
+GET /api/stocks/query/AAPL?expression=$average(data.volume)
+GET /api/stocks/query/TSLA?expression=$count(data)&limit=1000
+```
+
+**Example Usage:**
+```bash
+# Get NVIDIA's highest closing price since 2020
+curl -s "http://localhost:3000/api/stocks/query/NVDA?expression=\$max(data.close)&startDate=2020-01-01" | jq
+
+# Count trading days for Apple
+curl -s "http://localhost:3000/api/stocks/query/AAPL?expression=\$count(data)" | jq
+
+# Get Tesla's average volume
+curl -s "http://localhost:3000/api/stocks/query/TSLA?expression=\$average(data.volume)" | jq
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "symbol": "NVDA",
+  "query": "$max(data.close)",
+  "dataCount": 1000,
+  "dateRange": {
+    "start": "2020-01-01",
+    "end": "latest"
+  },
+  "result": 1224.4
+}
+```
+
+#### Execute multiple queries (Recommended)
+```bash
+POST /api/stocks/query/:symbol
+Content-Type: application/json
+
+{
+  "queries": {
+    "queryName1": "JSONATA_EXPRESSION_1",
+    "queryName2": "JSONATA_EXPRESSION_2"
+  },
+  "startDate": "YYYY-MM-DD",
+  "endDate": "YYYY-MM-DD",
+  "limit": 1000
+}
+```
+
+**Example - NVIDIA Analysis (Last 5 Years):**
+```bash
+curl -X POST http://localhost:3000/api/stocks/query/NVDA \
+-H "Content-Type: application/json" \
+-d '{
+  "queries": {
+    "globalHigh": "$max(data.high)",
+    "globalLow": "$min(data.low)",
+    "highestClose": "$max(data.close)",
+    "lowestClose": "$min(data.close)",
+    "totalReturn": "(data[0].close - data[-1].close) / data[-1].close * 100",
+    "priceRange": "$max(data.close) - $min(data.close)",
+    "avgVolume": "$average(data.volume)",
+    "recordCount": "$count(data)"
+  },
+  "startDate": "2020-01-01"
+}' | jq
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "symbol": "NVDA",
+  "dataCount": 1000,
+  "dateRange": {
+    "start": "2020-01-01",
+    "end": "latest"
+  },
+  "results": {
+    "globalHigh": 1255.87,
+    "globalLow": 86.62,
+    "highestClose": 1224.4,
+    "lowestClose": 94.31,
+    "totalReturn": -40.49,
+    "priceRange": 1130.09,
+    "avgVolume": 121715895.305,
+    "recordCount": 1000
+  }
+}
+```
+
+#### Built-in analysis endpoints
+
+**Global High/Low Analysis:**
+```bash
+GET /api/stocks/query/:symbol/high-low?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+# Example: NVIDIA highs and lows since 2020
+curl -s "http://localhost:3000/api/stocks/query/NVDA/high-low?startDate=2020-01-01" | jq
+```
+
+**Volume Statistics:**
+```bash
+GET /api/stocks/query/:symbol/volume?startDate=YYYY-MM-DD
+
+# Example: Apple volume analysis
+curl -s "http://localhost:3000/api/stocks/query/AAPL/volume?startDate=2023-01-01" | jq
+```
+
+**Price Performance Analysis:**
+```bash
+GET /api/stocks/query/:symbol/performance?startDate=YYYY-MM-DD
+
+# Example: Tesla performance metrics since 2022
+curl -s "http://localhost:3000/api/stocks/query/TSLA/performance?startDate=2022-01-01" | jq
+```
+
+**Moving Averages:**
+```bash
+GET /api/stocks/query/:symbol/moving-averages?periods=20,50,200&startDate=YYYY-MM-DD
+
+# Example: Microsoft moving averages
+curl -s "http://localhost:3000/api/stocks/query/MSFT/moving-averages?periods=20,50" | jq
+```
+
+**Pattern Detection:**
+```bash
+GET /api/stocks/query/:symbol/patterns?startDate=YYYY-MM-DD
+
+# Example: Google price patterns and large moves
+curl -s "http://localhost:3000/api/stocks/query/GOOGL/patterns?startDate=2023-01-01" | jq
+```
+
+#### Advanced JSONata Examples
+
+**Find specific price conditions:**
+```bash
+curl -X POST http://localhost:3000/api/stocks/query/NVDA \
+-H "Content-Type: application/json" \
+-d '{
+  "queries": {
+    "bigGainDays": "$count(data[(close - open) / open * 100 > 10])",
+    "bigLossDays": "$count(data[(close - open) / open * 100 < -10])", 
+    "volatileDays": "$count(data[((high - low) / open * 100) > 15])",
+    "greenDaysPercent": "$count(data[close > open]) / $count(data) * 100"
+  },
+  "startDate": "2020-01-01"
+}' | jq
+```
+
+**Complex aggregations:**
+```bash
+curl -X POST http://localhost:3000/api/stocks/query/AAPL \
+-H "Content-Type: application/json" \
+-d '{
+  "queries": {
+    "weeklyHigh": "$max(data[0..4].high)",
+    "monthlyVolume": "$sum(data[0..21].volume)",
+    "priceAbove200": "$count(data[close > 200])",
+    "volumeSpikes": "$count(data[volume > $average(data.volume) * 2])"
+  }
+}' | jq
+```
+
+### Legacy Watchlist API
+
+#### Get all stocks
+```bash
+GET /api/stocks
+```
+
+#### Get a single stock
+```bash
+GET /api/stocks/:id
+```
+
+#### Create a new stock
+```bash
+POST /api/stocks
 Content-Type: application/json
 
 {
@@ -77,9 +340,9 @@ Content-Type: application/json
 }
 ```
 
-### Update a stock
+#### Update a stock
 ```bash
-PUT http://localhost:3000/api/stocks/:id
+PUT /api/stocks/:id
 Content-Type: application/json
 
 {
@@ -88,23 +351,215 @@ Content-Type: application/json
 }
 ```
 
-### Delete a stock
+#### Delete a stock
 ```bash
-DELETE http://localhost:3000/api/stocks/:id
+DELETE /api/stocks/:id
+```
+
+### Historical Data API
+
+#### Get historical stock data
+```bash
+GET /api/stocks/historical/:symbol?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&limit=1000
+
+# Examples:
+GET /api/stocks/historical/AAPL                    # All available data
+GET /api/stocks/historical/AAPL?limit=30           # Last 30 records
+GET /api/stocks/historical/TSLA?startDate=2024-01-01&endDate=2024-12-31
+```
+
+**Response Format:**
+```json
+{
+  "symbol": "AAPL",
+  "count": 5,
+  "startDate": "2024-01-01",
+  "endDate": "2024-12-31",
+  "data": [
+    {
+      "symbol": "AAPL",
+      "date": "2025-11-14",
+      "open": 271.05,
+      "high": 275.96,
+      "low": 269.6,
+      "close": 272.41,
+      "adjusted_close": 272.41,
+      "volume": 47431331,
+      "created_at": "2025-11-15 21:35:13"
+    }
+  ]
+}
+```
+
+### Real-time Market Data
+
+#### Get current stock quote
+```bash
+GET /api/stocks/quote/:symbol
+
+# Example:
+GET /api/stocks/quote/NVDA
+```
+
+**Response Format:**
+```json
+{
+  "data": {
+    "symbol": "NVDA",
+    "open": 182.86,
+    "high": 191.01,
+    "low": 180.58,
+    "price": 190.17,
+    "volume": 186591856,
+    "latestTradingDay": "2025-11-14",
+    "previousClose": 186.86,
+    "change": 3.31,
+    "changePercent": "1.7714%"
+  }
+}
+```
+
+#### Get company overview
+```bash
+GET /api/stocks/overview/:symbol
+
+# Example:
+GET /api/stocks/overview/AAPL
+```
+
+### Data Management
+
+#### Initialize Magnificent 7 stocks
+```bash
+POST /api/stocks/init
+Content-Type: application/json
+
+{
+  "forceRefresh": false
+}
+```
+
+#### Refresh data for specific stock
+```bash
+POST /api/stocks/refresh/:symbol
+Content-Type: application/json
+
+{
+  "fullRefresh": false
+}
+
+# Examples:
+POST /api/stocks/refresh/AAPL           # Recent data (~100 days)
+POST /api/stocks/refresh/TSLA           # Full historical data (20+ years)
+```
+
+#### Refresh all tracked stocks
+```bash
+POST /api/stocks/refresh-all
+Content-Type: application/json
+
+{
+  "fullRefresh": false
+}
+```
+
+#### Add custom stock
+```bash
+POST /api/stocks/add-stock/:symbol
+Content-Type: application/json
+
+{
+  "name": "Optional Company Name"
+}
+
+# Example:
+POST /api/stocks/add-stock/NVDA
+```
+
+#### Get system information
+```bash
+GET /api/stocks/summary              # Database statistics
+GET /api/stocks/tracked              # All tracked stocks
+GET /api/stocks/magnificent-7        # Magnificent 7 list
+GET /api/stocks/init/status          # Initialization status
 ```
 
 ## 🧪 Testing the API
 
-Using curl:
+### Quick Start Examples
+
+```bash
+# 1. Check if API is configured
+curl -s http://localhost:3000/api/stocks/init/status | jq
+
+# 2. Initialize Magnificent 7 stocks (first time setup)
+curl -X POST http://localhost:3000/api/stocks/init \
+  -H "Content-Type: application/json" \
+  -d '{"forceRefresh": false}' | jq
+
+# 3. Get database summary
+curl -s http://localhost:3000/api/stocks/summary | jq
+
+# 4. Get historical data for Apple (last 5 records)
+curl -s "http://localhost:3000/api/stocks/historical/AAPL?limit=5" | jq
+
+# 5. Get real-time quote for Tesla
+curl -s http://localhost:3000/api/stocks/quote/TSLA | jq
+```
+
+### JSONata Query Examples
+
+```bash
+# Get available query templates
+curl -s http://localhost:3000/api/stocks/query/templates | jq
+
+# Simple queries - NVIDIA analysis
+curl -s "http://localhost:3000/api/stocks/query/NVDA?expression=\$max(data.close)" | jq
+curl -s "http://localhost:3000/api/stocks/query/NVDA?expression=\$min(data.low)&startDate=2020-01-01" | jq
+
+# Built-in analysis endpoints
+curl -s "http://localhost:3000/api/stocks/query/NVDA/high-low?startDate=2020-01-01" | jq
+curl -s "http://localhost:3000/api/stocks/query/AAPL/performance?startDate=2023-01-01" | jq
+curl -s "http://localhost:3000/api/stocks/query/TSLA/volume?startDate=2022-01-01" | jq
+
+# Multiple queries - comprehensive analysis
+curl -X POST http://localhost:3000/api/stocks/query/NVDA \
+-H "Content-Type: application/json" \
+-d '{
+  "queries": {
+    "globalHigh": "$max(data.high)",
+    "globalLow": "$min(data.low)",
+    "totalReturn": "(data[0].close - data[-1].close) / data[-1].close * 100",
+    "avgVolume": "$average(data.volume)",
+    "bigMoveDays": "$count(data[abs((close - open) / open * 100) > 5])"
+  },
+  "startDate": "2020-01-01"
+}' | jq
+
+# Pattern analysis
+curl -X POST http://localhost:3000/api/stocks/query/AAPL \
+-H "Content-Type: application/json" \
+-d '{
+  "queries": {
+    "greenDays": "$count(data[close > open])",
+    "redDays": "$count(data[close < open])",
+    "greenPercent": "$count(data[close > open]) / $count(data) * 100",
+    "volatileDays": "$count(data[((high - low) / open * 100) > 10])"
+  },
+  "startDate": "2023-01-01"
+}' | jq
+```
+
+### Legacy Watchlist API Examples
 
 ```bash
 # Health check
 curl http://localhost:3000/health
 
-# Get all stocks
+# Get all stocks in watchlist
 curl http://localhost:3000/api/stocks
 
-# Add a stock
+# Add a stock to watchlist
 curl -X POST http://localhost:3000/api/stocks \
   -H "Content-Type: application/json" \
   -d '{
@@ -123,7 +578,100 @@ curl -X PUT http://localhost:3000/api/stocks/1 \
 curl -X DELETE http://localhost:3000/api/stocks/1
 ```
 
-## 📁 Project Structure
+### Historical Data Examples
+
+```bash
+# Get all tracked stocks
+curl -s http://localhost:3000/api/stocks/tracked | jq
+
+# Get historical data for different symbols
+curl -s "http://localhost:3000/api/stocks/historical/MSFT?limit=3" | jq
+curl -s "http://localhost:3000/api/stocks/historical/GOOGL?startDate=2024-01-01&endDate=2024-12-31" | jq
+
+# Get real-time quotes
+curl -s http://localhost:3000/api/stocks/quote/META | jq
+curl -s http://localhost:3000/api/stocks/quote/NVDA | jq
+
+# Get company information
+curl -s http://localhost:3000/api/stocks/overview/AMZN | jq
+```
+
+### Data Management Examples
+
+```bash
+# Refresh specific stock data
+curl -X POST http://localhost:3000/api/stocks/refresh/AAPL \
+  -H "Content-Type: application/json" \
+  -d '{"fullRefresh": false}' | jq
+
+# Add a custom stock (e.g., Netflix)
+curl -X POST http://localhost:3000/api/stocks/add-stock/NFLX \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Netflix Inc."}' | jq
+
+# Refresh all tracked stocks
+curl -X POST http://localhost:3000/api/stocks/refresh-all \
+  -H "Content-Type: application/json" \
+  -d '{"fullRefresh": false}' | jq
+
+# Get Magnificent 7 list
+curl -s http://localhost:3000/api/stocks/magnificent-7 | jq
+```
+
+## � Data Overview
+
+This backend maintains a comprehensive SQLite database with both historical stock data and watchlist functionality:
+
+### Historical Stock Data
+- **32,364+ daily records** spanning from 1999 to 2025
+- **Magnificent 7 tech stocks**: AAPL, MSFT, GOOGL, AMZN, TSLA, META, NVDA
+- **Daily OHLCV data**: Open, High, Low, Close prices and Volume
+- **Real-time capabilities**: Live quotes and company information via Alpha Vantage API
+- **Flexible querying**: Date ranges, pagination, and symbol-based filtering
+
+### Database Statistics
+- **Data Range**: January 1999 - January 2025 (20+ years)
+- **Update Frequency**: Manual refresh via API endpoints
+- **Data Source**: Alpha Vantage Financial API
+- **Storage**: Local SQLite database for persistence
+- **Performance**: Indexed queries for fast historical lookups
+
+### Legacy Watchlist Features
+- Track personal stock positions with purchase prices and quantities
+- Perform CRUD operations on your watchlist
+- Monitor portfolio value changes
+- Calculate gains/losses based on current market prices
+
+### Data Structure
+```
+tracked_stocks: Configured symbols and metadata
+historical_stock_data: Daily OHLCV records with date indexing
+stocks: Personal watchlist entries (legacy feature)
+```
+
+## � Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+# Alpha Vantage API Configuration (Required)
+ALPHA_VANTAGE_API_KEY=your_api_key_here
+
+# Magnificent 7 Tech Stocks (Optional - uses default if not specified)
+MAGNIFICENT_7_STOCKS=AAPL,MSFT,GOOGL,AMZN,TSLA,META,NVDA
+
+# Server Configuration (Optional)
+PORT=3000
+NODE_ENV=development
+```
+
+**Environment Variable Details:**
+- `ALPHA_VANTAGE_API_KEY`: **Required** - Get free API key from [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
+- `MAGNIFICENT_7_STOCKS`: **Optional** - Comma-separated list of stock symbols to track
+- `PORT`: **Optional** - Server port (defaults to 3000)
+- `NODE_ENV`: **Optional** - Environment mode (development/production)
+
+## �📁 Project Structure
 
 ```
 stock-watch-list-rest-node/
@@ -133,14 +681,20 @@ stock-watch-list-rest-node/
 │   └── launch.json            # VS Code debugger configuration
 ├── src/
 │   ├── index.js               # Application entry point
-│   ├── database.js            # SQLite database setup
-│   └── routes/
-│       └── stocks.js          # Stock routes and handlers
-├── data/                      # SQLite database (auto-created)
+│   ├── database.js            # SQLite database setup and schema
+│   ├── routes/
+│   │   └── stocks.js          # Stock routes and API handlers
+│   └── services/
+│       ├── alphaVantageService.js    # Alpha Vantage API client
+│       ├── dataRefreshService.js     # Historical data operations
+│       └── dataInitService.js        # Magnificent 7 initialization
+├── data/                      # SQLite database files (auto-created)
+│   └── stocks.db              # Main database file
+├── .env                       # Environment variables (create from .env.example)
 ├── Dockerfile                 # Docker image definition
 ├── docker-compose.yml         # Docker Compose configuration
-├── package.json               # Node.js dependencies
-└── README.md                  # This file
+├── package.json               # Node.js dependencies and scripts
+└── README.md                  # This documentation
 ```
 
 ## 🔄 Live Reloading
@@ -187,6 +741,51 @@ docker-compose up
 
 ## 🔍 Troubleshooting
 
+### API Key Issues
+```bash
+# Check if API key is configured
+curl -s http://localhost:3000/api/stocks/init/status | jq
+
+# Verify API key works
+curl -s "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=YOUR_API_KEY"
+```
+
+**Common API Issues:**
+- `Missing API key`: Set `ALPHA_VANTAGE_API_KEY` in `.env`
+- `Rate limit exceeded`: Free tier allows 25 requests/day
+- `Invalid symbol`: Check stock symbol is correct (e.g., GOOGL not GOOGLE)
+- `Network timeout`: Alpha Vantage API can be slow, wait and retry
+
+### JSONata Query Issues
+```bash
+# Test query templates first
+curl -s http://localhost:3000/api/stocks/query/templates | jq
+
+# Verify data exists for symbol
+curl -s "http://localhost:3000/api/stocks/historical/NVDA?limit=1" | jq
+
+# Test simple expression
+curl -s "http://localhost:3000/api/stocks/query/NVDA?expression=\$count(data)" | jq
+```
+
+**Common JSONata Issues:**
+- `Syntax error`: Check JSONata expression syntax (use $ for functions)
+- `No data found`: Ensure stock symbol has historical data loaded
+- `URL encoding`: Use POST with JSON body for complex expressions
+- `Type errors`: Ensure operations are on correct data types (numbers vs strings)
+
+**JSONata Expression Examples:**
+```bash
+# Correct syntax
+"$max(data.close)"              # ✅ Get maximum close price
+"$count(data[close > open])"    # ✅ Count green days
+"(data[0].close - data[-1].close) / data[-1].close * 100"  # ✅ Total return
+
+# Common mistakes  
+"max(data.close)"               # ❌ Missing $ prefix
+"$count(data.close > open)"     # ❌ Wrong filter syntax
+```
+
 ### Port already in use
 If port 3000 or 9229 is already in use, modify the ports in `docker-compose.yml`:
 ```yaml
@@ -207,10 +806,32 @@ docker-compose up
 ```
 
 ### Database issues
-Delete the `data/` directory and restart the container to reset the database:
 ```bash
+# Check initialization status
+curl -s http://localhost:3000/api/stocks/init/status | jq
+
+# Get database summary
+curl -s http://localhost:3000/api/stocks/summary | jq
+
+# Reset database (WARNING: Deletes all data)
 rm -rf data/
 docker-compose restart
+```
+
+### Historical Data Issues
+```bash
+# Check if data exists for a symbol
+curl -s "http://localhost:3000/api/stocks/historical/AAPL?limit=1" | jq
+
+# Manual refresh specific stock
+curl -X POST http://localhost:3000/api/stocks/refresh/AAPL \
+  -H "Content-Type: application/json" \
+  -d '{"fullRefresh": true}' | jq
+
+# Re-initialize all Magnificent 7 stocks
+curl -X POST http://localhost:3000/api/stocks/init \
+  -H "Content-Type: application/json" \
+  -d '{"forceRefresh": true}' | jq
 ```
 
 ## 📝 License
